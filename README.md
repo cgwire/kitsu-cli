@@ -9,13 +9,13 @@ Kitsu-cli exposes Gazu's 260+ functions as structured CLI commands. Output defau
 Requires Python 3.10+.
 
 ```bash
-pip install kitsu-cli
+pip install git+https://github.com/cgwire/kitsu-cli.git
 ```
 
 Or with [uv](https://docs.astral.sh/uv/):
 
 ```bash
-uv pip install kitsu-cli
+uv pip install git+https://github.com/cgwire/kitsu-cli.git
 ```
 
 For development install, see [development.md](development.md).
