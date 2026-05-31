@@ -63,8 +63,14 @@ def create(ctx, name, production_type, production_style):
 @click.argument("project")
 @click.option("--name", help="New name.")
 @click.option("--data", "extra_data", type=str, help="JSON metadata to merge.")
+@click.option(
+    "--bot-collaboration/--no-bot-collaboration",
+    "bot_collaboration",
+    default=None,
+    help="Allow AI-agent (bot) assignment and time logging on this project.",
+)
 @click.pass_context
-def update(ctx, project, name, extra_data):
+def update(ctx, project, name, extra_data, bot_collaboration):
     """Update a project."""
     import json as json_mod
 
@@ -74,6 +80,8 @@ def update(ctx, project, name, extra_data):
         proj["name"] = name
     if extra_data:
         proj["data"] = {**(proj.get("data") or {}), **json_mod.loads(extra_data)}
+    if bot_collaboration is not None:
+        proj["is_bot_collaboration_enabled"] = bot_collaboration
     result = gazu.project.update_project(proj)
     output(result, ctx)
 

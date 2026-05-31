@@ -41,6 +41,45 @@ def test_project_create(invoke):
         )
 
 
+def test_project_update_enable_bot_collaboration(invoke):
+    with patch("kitsu_cli.commands.project.gazu") as mock_gazu, \
+         patch("kitsu_cli.commands.project.require_auth"), \
+         patch("kitsu_cli.commands.project.resolve_project", return_value=dict(MOCK_PROJECT)):
+        mock_gazu.project.update_project.side_effect = lambda p: p
+        result = invoke(
+            "--format", "json", "project", "update",
+            "project-uuid-1", "--bot-collaboration",
+        )
+        assert result.exit_code == 0
+        sent = mock_gazu.project.update_project.call_args[0][0]
+        assert sent["is_bot_collaboration_enabled"] is True
+
+
+def test_project_update_disable_bot_collaboration(invoke):
+    with patch("kitsu_cli.commands.project.gazu") as mock_gazu, \
+         patch("kitsu_cli.commands.project.require_auth"), \
+         patch("kitsu_cli.commands.project.resolve_project", return_value=dict(MOCK_PROJECT)):
+        mock_gazu.project.update_project.side_effect = lambda p: p
+        result = invoke(
+            "--format", "json", "project", "update",
+            "project-uuid-1", "--no-bot-collaboration",
+        )
+        assert result.exit_code == 0
+        sent = mock_gazu.project.update_project.call_args[0][0]
+        assert sent["is_bot_collaboration_enabled"] is False
+
+
+def test_project_update_leaves_bot_collaboration_untouched(invoke):
+    with patch("kitsu_cli.commands.project.gazu") as mock_gazu, \
+         patch("kitsu_cli.commands.project.require_auth"), \
+         patch("kitsu_cli.commands.project.resolve_project", return_value=dict(MOCK_PROJECT)):
+        mock_gazu.project.update_project.side_effect = lambda p: p
+        result = invoke("project", "update", "project-uuid-1", "--name", "Renamed")
+        assert result.exit_code == 0
+        sent = mock_gazu.project.update_project.call_args[0][0]
+        assert "is_bot_collaboration_enabled" not in sent
+
+
 def test_project_delete(invoke):
     with patch("kitsu_cli.commands.project.gazu") as mock_gazu, \
          patch("kitsu_cli.commands.project.require_auth"), \
