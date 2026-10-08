@@ -59,3 +59,44 @@ def test_asset_type_list(invoke):
         result = invoke("--format", "json", "asset", "type", "list")
         assert result.exit_code == 0
         assert "Character" in result.output
+
+
+def test_asset_create_with_tasks_uses_the_route_of_zou(invoke):
+    # gazu <= 1.3.1 posts to data/assets/<id>/tasks, which is GET only.
+    with patch("kitsu_cli.commands.asset.gazu") as mock_gazu, \
+         patch("kitsu_cli.commands.asset.require_auth"), \
+         patch("kitsu_cli.commands.asset.resolve_project", return_value=MOCK_PROJECT), \
+         patch("kitsu_cli.commands.asset.resolve_asset_type", return_value={"id": "type-1", "name": "Module"}), \
+         patch("kitsu_cli.commands.asset.resolve_task_type",
+               side_effect=lambda name: {"id": f"tt-{name}"}):
+        mock_gazu.asset.new_asset.return_value = MOCK_ASSET
+        result = invoke(
+            "asset", "create", "--project", "Test Project", "--type", "Module",
+            "--with-tasks", "--task-type", "Specs", "--task-type", "Plan",
+            "Character01",
+        )
+        assert result.exit_code == 0
+        mock_gazu.client.post.assert_called_once_with(
+            "data/entities/asset-uuid-1/tasks",
+            {"task_type_ids": ["tt-Specs", "tt-Plan"]},
+        )
+
+
+def test_asset_create_with_tasks_defaults_to_the_task_types_of_the_project(invoke):
+    with patch("kitsu_cli.commands.asset.gazu") as mock_gazu, \
+         patch("kitsu_cli.commands.asset.require_auth"), \
+         patch("kitsu_cli.commands.asset.resolve_project", return_value=MOCK_PROJECT), \
+         patch("kitsu_cli.commands.asset.resolve_asset_type", return_value={"id": "type-1", "name": "Module"}):
+        mock_gazu.asset.new_asset.return_value = MOCK_ASSET
+        mock_gazu.task.all_task_types_for_project.return_value = [
+            {"id": "tt-1", "for_entity": "Asset"},
+            {"id": "tt-2", "for_entity": "Shot"},
+        ]
+        result = invoke(
+            "asset", "create", "--project", "Test Project", "--type", "Module",
+            "--with-tasks", "Character01",
+        )
+        assert result.exit_code == 0
+        mock_gazu.client.post.assert_called_once_with(
+            "data/entities/asset-uuid-1/tasks", {"task_type_ids": ["tt-1"]}
+        )

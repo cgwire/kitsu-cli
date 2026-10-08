@@ -14,9 +14,9 @@ def group():
     pass
 
 
-@group.command()
+@group.command("list")
 @click.pass_context
-def list(ctx):
+def list_cmd(ctx):
     """List all persons."""
     require_auth(ctx)
     results = gazu.person.all_persons()
@@ -75,7 +75,9 @@ def create(ctx, first_name, last_name, email, phone, role, desktop_login, depart
 def update(ctx, person, first_name, last_name, email, phone, role, active):
     """Update a person."""
     require_auth(ctx)
-    p = resolve_person(person)
+    # Send only the changed fields. Zou regenerates the token of a bot when
+    # the body contains "expiration_date", even with the same value.
+    p = {"id": resolve_person(person)["id"]}
     if first_name:
         p["first_name"] = first_name
     if last_name:

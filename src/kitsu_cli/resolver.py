@@ -27,13 +27,20 @@ def resolve_project(value: str) -> dict:
     return result
 
 
-def resolve_asset(value: str) -> dict:
+def resolve_asset(value: str, project: str | None = None) -> dict:
+    """Resolve an asset by UUID, or by name inside a project."""
     import gazu
 
     if is_uuid(value):
         return gazu.asset.get_asset(value)
-    click.echo("Error: Asset lookup by name requires --project. Use UUID instead.", err=True)
-    sys.exit(1)
+    if not project:
+        click.echo("Error: Asset lookup by name requires --project. Use UUID instead.", err=True)
+        sys.exit(1)
+    result = gazu.asset.get_asset_by_name(resolve_project(project), value)
+    if not result:
+        click.echo(f"Error: Asset not found in {project}: {value}", err=True)
+        sys.exit(1)
+    return result
 
 
 def resolve_asset_type(value: str) -> dict:

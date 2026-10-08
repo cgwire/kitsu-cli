@@ -10,6 +10,8 @@ import gazu
 from kitsu_cli.client import require_auth
 from kitsu_cli.output import output
 from kitsu_cli.resolver import (
+    is_uuid,
+    resolve_asset,
     resolve_department,
     resolve_person,
     resolve_project,
@@ -38,7 +40,7 @@ def group():
 # --- Task commands ---
 
 
-@group.command()
+@group.command("list")
 @click.option("--project", help="Project UUID or name.")
 @click.option("--asset", help="Asset UUID.")
 @click.option("--shot", help="Shot UUID.")
@@ -53,7 +55,7 @@ def group():
 @click.option("--task-status", "task_status", help="Task status UUID or name.")
 @click.option("--relations", is_flag=True, help="Include related entities.")
 @click.pass_context
-def list(ctx, project, asset, shot, sequence, episode, concept, edit, scene, person, assignee, task_type, task_status, relations):
+def list_cmd(ctx, project, asset, shot, sequence, episode, concept, edit, scene, person, assignee, task_type, task_status, relations):
     """List tasks with various filters.
 
     Filters can be combined: --project with --task-type and/or --task-status,
@@ -236,7 +238,9 @@ def start(ctx, task, person):
 def assign(ctx, task, person):
     """Assign a person to a task."""
     require_auth(ctx)
-    result = gazu.task.assign_task(task, resolve_person(person))
+    # gazu <= 1.3.1 sends task_ids as a string: Zou refuses it.
+    person_id = resolve_person(person)["id"]
+    result = gazu.client.put(f"actions/persons/{person_id}/assign", {"task_ids": [task]})
     output(result, ctx)
 
 
@@ -277,14 +281,18 @@ def list_open(ctx, person):
 
 
 @group.command("get-by-entity")
-@click.argument("entity", metavar="ENTITY_UUID")
+@click.argument("entity", metavar="ENTITY")
 @click.option("--task-type", "task_type", required=True, help="Task type UUID or name.")
 @click.option("--name", default="main", help="Task name.")
+@click.option("--project", help="Project UUID or name, to find an asset by name.")
 @click.pass_context
-def get_by_entity(ctx, entity, task_type, name):
-    """Get a task by entity, task type, and name."""
+def get_by_entity(ctx, entity, task_type, name, project):
+    """Get a task by entity (UUID, or asset name with --project), task type, and name."""
     require_auth(ctx)
-    result = gazu.task.get_task_by_entity(entity, resolve_task_type(task_type), name=name)
+    tt = resolve_task_type(task_type)
+    if not is_uuid(entity):
+        entity = resolve_asset(entity, project)
+    result = gazu.task.get_task_by_entity(entity, tt, name=name)
     output(result, ctx)
 
 
@@ -295,7 +303,9 @@ def get_by_entity(ctx, entity, task_type, name):
 def batch_assign(ctx, person, tasks):
     """Assign multiple tasks to a person."""
     require_auth(ctx)
-    result = gazu.task.assign_tasks_to_person(resolve_person(person), list(tasks))
+    # gazu <= 1.3.1 calls data/tasks/assign, a route that Zou does not have.
+    person_id = resolve_person(person)["id"]
+    result = gazu.client.put(f"actions/persons/{person_id}/assign", {"task_ids": list(tasks)})
     output(result, ctx)
 
 
@@ -324,10 +334,12 @@ def create_tasks(ctx, entity, task_types, entity_type):
     tt_list = [resolve_task_type(tt) for tt in task_types]
     if entity_type == "shot":
         result = gazu.task.create_shot_tasks(entity, tt_list)
-    elif entity_type == "asset":
-        result = gazu.task.create_asset_tasks(entity, tt_list)
     else:
-        result = gazu.task.create_entity_tasks(entity, tt_list)
+        # gazu <= 1.3.1 posts asset tasks to data/assets/<id>/tasks, which is
+        # GET only. Zou creates the tasks of any entity on this route.
+        result = gazu.client.post(
+            f"data/entities/{entity}/tasks", {"task_type_ids": [tt["id"] for tt in tt_list]}
+        )
     output(result, ctx)
 
 
@@ -589,6 +601,40 @@ def preview_publish(ctx, task, task_status, comment_text, file_path, file_url, s
         kwargs["person"] = resolve_person(person)
     comment_result, preview_result = gazu.task.publish_preview(task, ts, **kwargs)
     output({"comment": comment_result, "preview": preview_result}, ctx)
+
+
+@preview_group.command("tokens")
+@click.argument("preview_file")
+@click.option("--in", "token_in", type=click.IntRange(min=0), required=True, help="Input tokens to add.")
+@click.option("--out", "token_out", type=click.IntRange(min=0), required=True, help="Output tokens to add.")
+@click.pass_context
+def preview_tokens(ctx, preview_file, token_in, token_out):
+    """Add token counts to a preview, and to the data of its entity.
+
+    The entity keeps the sum of the counts of its previews.
+    """
+    require_auth(ctx)
+    preview = gazu.client.get(f"data/preview-files/{preview_file}")
+    counts = {
+        "token_in": (preview.get("token_in") or 0) + token_in,
+        "token_out": (preview.get("token_out") or 0) + token_out,
+    }
+    gazu.client.put(f"data/preview-files/{preview_file}", counts)
+
+    task = gazu.client.get(f"data/tasks/{preview['task_id']}")
+    entity = gazu.client.get(f"data/entities/{task['entity_id']}")
+    data = dict(entity.get("data") or {})
+    data["token_in"] = (data.get("token_in") or 0) + token_in
+    data["token_out"] = (data.get("token_out") or 0) + token_out
+    gazu.client.put(f"data/entities/{task['entity_id']}", {"data": data})
+
+    output(
+        {
+            "preview": counts,
+            "entity": {"token_in": data["token_in"], "token_out": data["token_out"]},
+        },
+        ctx,
+    )
 
 
 @preview_group.command("set-main")

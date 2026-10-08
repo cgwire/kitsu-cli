@@ -13,6 +13,7 @@ from kitsu_cli.resolver import (
     resolve_episode,
     resolve_project,
     resolve_shot,
+    resolve_task_type,
 )
 
 
@@ -74,8 +75,12 @@ def get(ctx, asset, project, by_name):
 @click.option("--episode", default=None, help="Episode UUID (for TV shows).")
 @click.option("--data", "extra_data", default=None, help="JSON metadata.")
 @click.option("--with-tasks", is_flag=True, help="Create default tasks for the asset.")
+@click.option(
+    "--task-type", "task_types", multiple=True,
+    help="With --with-tasks: task type UUID or name (repeatable). Default: the asset task types of the project.",
+)
 @click.pass_context
-def create(ctx, project, asset_type, name, description, episode, extra_data, with_tasks):
+def create(ctx, project, asset_type, name, description, episode, extra_data, with_tasks, task_types):
     """Create a new asset."""
     require_auth(ctx)
     proj = resolve_project(project)
@@ -91,10 +96,18 @@ def create(ctx, project, asset_type, name, description, episode, extra_data, wit
 
     result = gazu.asset.new_asset(proj, at, name, **kwargs)
     if with_tasks:
-        task_types = gazu.task.all_task_types_for_project(proj)
-        gazu.task.create_asset_tasks(result, task_types)
+        if task_types:
+            type_ids = [resolve_task_type(tt)["id"] for tt in task_types]
+        else:
+            type_ids = [
+                tt["id"]
+                for tt in gazu.task.all_task_types_for_project(proj)
+                if tt.get("for_entity", "Asset") == "Asset"
+            ]
+        # gazu <= 1.3.1 posts to data/assets/<id>/tasks, which is GET only.
+        gazu.client.post(f"data/entities/{result['id']}/tasks", {"task_type_ids": type_ids})
         if not ctx.obj.get("quiet"):
-            click.echo(f"Created {len(task_types)} task(s).", err=True)
+            click.echo(f"Created {len(type_ids)} task(s).", err=True)
     output(result, ctx)
 
 
