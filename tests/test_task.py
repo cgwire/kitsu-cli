@@ -164,14 +164,22 @@ def test_task_url_follows_the_entity_type_of_the_task(invoke):
             assert result.output.strip() == expected, for_entity
 
 
-def test_task_url_gives_the_episode_of_a_shot_in_a_tv_show(invoke):
+def test_task_url_gives_the_episode_in_a_tv_show(invoke):
     host = "https://kitsu.test"
-    with patch("kitsu_cli.commands.task.gazu") as mock_gazu, \
-         patch("kitsu_cli.commands.task.require_auth"):
-        mock_gazu.task.get_task.return_value = _full_task("Shot", "tvshow")
-        mock_gazu.shot.get_shot.return_value = {"episode_id": "episode-1"}
-        mock_gazu.client.get_api_url_from_host.return_value = host
-        result = invoke("task", "task-url", "task-1")
-        assert result.output.strip() == (
-            f"{host}/productions/project-1/episodes/episode-1/shots/tasks/task-1/"
-        )
+    base = f"{host}/productions/project-1/episodes"
+    cases = [
+        ("Shot", {"episode": {"id": "ep-1"}}, f"{base}/ep-1/shots/tasks/task-1/"),
+        ("Sequence", {"episode": {"id": "ep-1"}}, f"{base}/ep-1/sequences/tasks/task-1/"),
+        ("Edit", {"entity": {"parent_id": "ep-1"}}, f"{base}/ep-1/edits/tasks/task-1/"),
+        ("Asset", {"entity": {"source_id": "ep-1"}}, f"{base}/ep-1/assets/tasks/task-1/"),
+        ("Asset", {"entity": {"source_id": None}}, f"{base}/main/assets/tasks/task-1/"),
+    ]
+    for for_entity, fields, expected in cases:
+        with patch("kitsu_cli.commands.task.gazu") as mock_gazu, \
+             patch("kitsu_cli.commands.task.require_auth"):
+            mock_gazu.task.get_task.return_value = {
+                **_full_task(for_entity, "tvshow"), **fields
+            }
+            mock_gazu.client.get_api_url_from_host.return_value = host
+            result = invoke("task", "task-url", "task-1")
+            assert result.output.strip() == expected, (for_entity, fields)

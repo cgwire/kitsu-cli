@@ -267,8 +267,9 @@ def task_url(ctx, task):
     click.echo(_task_url(t))
 
 
-# gazu.task.get_task_url always gives a shots/ path. Same routes as getTaskPath
-# in kitsu/src/lib/path.js.
+# gazu.task.get_task_url gives a shots/ path in the gazu versions of today
+# (fix: cgwire/gazu, branch fix/task-url). Same routes as getTaskPath in
+# kitsu/src/lib/path.js.
 _ROUTE_TYPES = {"Shot": "shots", "Edit": "edits", "Sequence": "sequences"}
 
 
@@ -278,12 +279,25 @@ def _task_url(t):
     if for_entity == "Episode":
         return f"{base}/episodes/{t['entity_id']}/tasks/{t['id']}/"
     route_type = _ROUTE_TYPES.get(for_entity, "assets")
-    is_tv_show = (t.get("project") or {}).get("production_type") == "tvshow"
-    if is_tv_show and for_entity == "Shot":
-        episode_id = gazu.shot.get_shot(t["entity_id"]).get("episode_id")
+    if (t.get("project") or {}).get("production_type") == "tvshow":
+        episode_id = _episode_id(t, for_entity)
         if episode_id:
             base = f"{base}/episodes/{episode_id}"
     return f"{base}/{route_type}/tasks/{t['id']}/"
+
+
+# The full task gives the episode of a shot or a sequence. An edit belongs to
+# its parent episode. An asset belongs to the episode that created it, or to
+# the "main" pack of Kitsu.
+def _episode_id(t, for_entity):
+    if t.get("episode"):
+        return t["episode"]["id"]
+    entity = t.get("entity") or {}
+    if for_entity == "Edit":
+        return entity.get("parent_id")
+    if for_entity == "Asset":
+        return entity.get("source_id") or "main"
+    return None
 
 
 @group.command("list-open")
