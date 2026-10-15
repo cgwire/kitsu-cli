@@ -133,3 +133,45 @@ def test_clear_assignations_passes_the_task_list(invoke):
         result = invoke("task", "clear-assignations", "task-1", "task-2")
         assert result.exit_code == 0
         mock_gazu.task.clear_assignations.assert_called_once_with(["task-1", "task-2"])
+
+
+def _full_task(for_entity, production_type="featurefilm", entity_id="entity-1"):
+    return {
+        "id": "task-1",
+        "project_id": "project-1",
+        "entity_id": entity_id,
+        "task_type": {"for_entity": for_entity},
+        "project": {"production_type": production_type},
+    }
+
+
+def test_task_url_follows_the_entity_type_of_the_task(invoke):
+    host = "https://kitsu.test"
+    cases = [
+        ("Asset", f"{host}/productions/project-1/assets/tasks/task-1/"),
+        ("Shot", f"{host}/productions/project-1/shots/tasks/task-1/"),
+        ("Edit", f"{host}/productions/project-1/edits/tasks/task-1/"),
+        ("Sequence", f"{host}/productions/project-1/sequences/tasks/task-1/"),
+        ("Episode", f"{host}/productions/project-1/episodes/entity-1/tasks/task-1/"),
+    ]
+    for for_entity, expected in cases:
+        with patch("kitsu_cli.commands.task.gazu") as mock_gazu, \
+             patch("kitsu_cli.commands.task.require_auth"):
+            mock_gazu.task.get_task.return_value = _full_task(for_entity)
+            mock_gazu.client.get_api_url_from_host.return_value = host
+            result = invoke("task", "task-url", "task-1")
+            assert result.exit_code == 0, result.output
+            assert result.output.strip() == expected, for_entity
+
+
+def test_task_url_gives_the_episode_of_a_shot_in_a_tv_show(invoke):
+    host = "https://kitsu.test"
+    with patch("kitsu_cli.commands.task.gazu") as mock_gazu, \
+         patch("kitsu_cli.commands.task.require_auth"):
+        mock_gazu.task.get_task.return_value = _full_task("Shot", "tvshow")
+        mock_gazu.shot.get_shot.return_value = {"episode_id": "episode-1"}
+        mock_gazu.client.get_api_url_from_host.return_value = host
+        result = invoke("task", "task-url", "task-1")
+        assert result.output.strip() == (
+            f"{host}/productions/project-1/episodes/episode-1/shots/tasks/task-1/"
+        )

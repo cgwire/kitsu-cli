@@ -264,7 +264,26 @@ def task_url(ctx, task):
     """Get the Kitsu URL for a task."""
     require_auth(ctx)
     t = gazu.task.get_task(task)
-    click.echo(gazu.task.get_task_url(t))
+    click.echo(_task_url(t))
+
+
+# gazu.task.get_task_url always gives a shots/ path. Same routes as getTaskPath
+# in kitsu/src/lib/path.js.
+_ROUTE_TYPES = {"Shot": "shots", "Edit": "edits", "Sequence": "sequences"}
+
+
+def _task_url(t):
+    base = f"{gazu.client.get_api_url_from_host()}/productions/{t['project_id']}"
+    for_entity = (t.get("task_type") or {}).get("for_entity") or "Asset"
+    if for_entity == "Episode":
+        return f"{base}/episodes/{t['entity_id']}/tasks/{t['id']}/"
+    route_type = _ROUTE_TYPES.get(for_entity, "assets")
+    is_tv_show = (t.get("project") or {}).get("production_type") == "tvshow"
+    if is_tv_show and for_entity == "Shot":
+        episode_id = gazu.shot.get_shot(t["entity_id"]).get("episode_id")
+        if episode_id:
+            base = f"{base}/episodes/{episode_id}"
+    return f"{base}/{route_type}/tasks/{t['id']}/"
 
 
 @group.command("list-open")
