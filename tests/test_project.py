@@ -88,3 +88,23 @@ def test_project_delete(invoke):
         result = invoke("project", "delete", "project-uuid-1")
         assert result.exit_code == 0
         assert "Deleted project Test Project" in result.output
+
+
+def test_budget_entry_create_sends_the_department_and_the_person(invoke):
+    with patch("kitsu_cli.commands.project.gazu") as mock_gazu, \
+         patch("kitsu_cli.commands.project.require_auth"), \
+         patch("kitsu_cli.commands.project.resolve_project", return_value={"id": "p1"}), \
+         patch("kitsu_cli.commands.project.resolve_department", return_value={"id": "d1"}), \
+         patch("kitsu_cli.commands.project.resolve_person", return_value={"id": "u1"}):
+        mock_gazu.project.create_budget_entry.return_value = {"id": "e1"}
+        result = invoke(
+            "project", "budget-entry", "create", "p1", "b1",
+            "--department", "Animation", "--person", "a@b.c",
+            "--months-duration", "3", "--daily-salary", "350",
+        )
+        assert result.exit_code == 0
+        mock_gazu.project.create_budget_entry.assert_called_once_with(
+            {"id": "p1"}, "b1", {"id": "d1"}, person={"id": "u1"},
+            position=None, seniority=None, start_date=None,
+            months_duration=3, daily_salary=350.0,
+        )

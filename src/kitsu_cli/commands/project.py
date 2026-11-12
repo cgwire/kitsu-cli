@@ -5,7 +5,14 @@ import gazu
 
 from kitsu_cli.client import require_auth
 from kitsu_cli.output import output
-from kitsu_cli.resolver import resolve_person, resolve_project, resolve_task_status, resolve_task_type
+from kitsu_cli.resolver import (
+    resolve_asset_type,
+    resolve_department,
+    resolve_person,
+    resolve_project,
+    resolve_task_status,
+    resolve_task_type,
+)
 
 
 @click.group("project")
@@ -134,13 +141,23 @@ def task_type_list(ctx, project):
 @click.argument("project")
 @click.argument("task_type")
 @click.option("--priority", default=1, help="Priority order.")
+@click.option("--hd-bitrate", type=int, default=None, help="HD movie bitrate in Mbit/s.")
+@click.option("--ld-bitrate", type=int, default=None, help="LD movie bitrate in Mbit/s.")
+@click.option("--client-visible/--no-client-visible", default=None, help="Show the task type to clients.")
 @click.pass_context
-def task_type_add(ctx, project, task_type, priority):
-    """Add a task type to a project."""
+def task_type_add(ctx, project, task_type, priority, hd_bitrate, ld_bitrate, client_visible):
+    """Add a task type to a project, or update its settings."""
     require_auth(ctx)
     proj = resolve_project(project)
     tt = resolve_task_type(task_type)
-    result = gazu.project.add_task_type(proj, tt, priority)
+    result = gazu.project.add_task_type(
+        proj,
+        tt,
+        priority,
+        hd_bitrate_compression=hd_bitrate,
+        ld_bitrate_compression=ld_bitrate,
+        is_client_visible=client_visible,
+    )
     output(result, ctx)
 
 
@@ -202,6 +219,20 @@ def task_status_remove(ctx, project, task_status):
         click.echo(f"Removed task status {ts.get('name', task_status)} from project.")
 
 
+@task_status.command("client-allowed")
+@click.argument("project")
+@click.argument("task_status")
+@click.option("--allow/--deny", required=True, help="Let clients set this status.")
+@click.pass_context
+def task_status_client_allowed(ctx, project, task_status, allow):
+    """Allow or deny a task status to the clients of a project."""
+    require_auth(ctx)
+    result = gazu.project.set_task_status_client_allowed(
+        resolve_project(project), resolve_task_status(task_status), allow
+    )
+    output(result, ctx)
+
+
 @group.group("asset-type")
 def asset_type():
     """Manage project asset types."""
@@ -217,6 +248,22 @@ def asset_type_list(ctx, project):
     proj = resolve_project(project)
     results = gazu.asset.all_asset_types_for_project(proj)
     output(results, ctx)
+
+
+@asset_type.command("workflow")
+@click.argument("project")
+@click.argument("asset_type")
+@click.option("--task-type", "task_types", multiple=True, help="Task type UUID or name (repeatable). Omit to restore the studio workflow.")
+@click.pass_context
+def asset_type_workflow(ctx, project, asset_type, task_types):
+    """Set the task types of an asset type in a project."""
+    require_auth(ctx)
+    result = gazu.project.update_asset_type_workflow(
+        resolve_project(project),
+        resolve_asset_type(asset_type),
+        [resolve_task_type(tt) for tt in task_types],
+    )
+    output(result, ctx)
 
 
 @group.command()
@@ -536,28 +583,28 @@ def budget_entry_list(ctx, project, budget_id):
 @budget_entry.command("create")
 @click.argument("project")
 @click.argument("budget_id")
-@click.argument("name")
-@click.option("--date", default=None, help="Entry date (YYYY-MM-DD).")
-@click.option("--amount", type=float, default=None, help="Total amount.")
-@click.option("--quantity", type=float, default=None, help="Quantity.")
-@click.option("--unit-price", type=float, default=None, help="Unit price.")
-@click.option("--description", default=None, help="Entry description.")
-@click.option("--category", default=None, help="Category label.")
+@click.option("--department", required=True, help="Department UUID or name.")
+@click.option("--person", default=None, help="Person UUID or email.")
+@click.option("--position", default=None, help="Position of the person.")
+@click.option("--seniority", default=None, help="Seniority of the person.")
+@click.option("--start-date", default=None, help="Start date (YYYY-MM-DD).")
+@click.option("--months-duration", type=int, default=None, help="Duration in months.")
+@click.option("--daily-salary", type=float, default=None, help="Daily salary.")
 @click.pass_context
-def budget_entry_create(ctx, project, budget_id, name, date, amount, quantity, unit_price, description, category):
+def budget_entry_create(ctx, project, budget_id, department, person, position, seniority,
+                        start_date, months_duration, daily_salary):
     """Create a budget entry."""
     require_auth(ctx)
-    proj = resolve_project(project)
     result = gazu.project.create_budget_entry(
-        proj,
+        resolve_project(project),
         budget_id,
-        name,
-        date=date,
-        amount=amount,
-        quantity=quantity,
-        unit_price=unit_price,
-        description=description,
-        category=category,
+        resolve_department(department),
+        person=resolve_person(person) if person else None,
+        position=position,
+        seniority=seniority,
+        start_date=start_date,
+        months_duration=months_duration,
+        daily_salary=daily_salary,
     )
     output(result, ctx)
 
