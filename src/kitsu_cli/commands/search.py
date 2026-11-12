@@ -17,20 +17,19 @@ def group():
 @group.command()
 @click.argument("query")
 @click.option("--limit", default=3, type=int, help="Max results per index (default: 3).")
+@click.option("--offset", default=None, type=int, help="Number of results to skip per index.")
 @click.option("--project", default=None, help="Project UUID or name to scope the search.")
 @click.pass_context
-def query(ctx, query, limit, project):
+def query(ctx, query, limit, offset, project):
     """Global search across assets, shots, persons, edits, and sequences."""
     require_auth(ctx)
-    body = {
-        "query": query,
-        "limit": limit,
-        "index_names": ["assets", "shots", "persons", "edits", "sequences"],
-    }
-    if project:
-        proj = resolve_project(project)
-        body["project_id"] = proj["id"]
-    result = gazu.client.post("data/search", body)
+    result = gazu.search.search_entities(
+        query,
+        project=resolve_project(project) if project else None,
+        index_names=["assets", "shots", "persons", "edits", "sequences"],
+        limit=limit,
+        offset=offset,
+    )
     output(result, ctx)
 
 

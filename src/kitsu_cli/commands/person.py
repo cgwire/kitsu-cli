@@ -71,8 +71,10 @@ def create(ctx, first_name, last_name, email, phone, role, desktop_login, depart
 @click.option("--phone", default=None)
 @click.option("--role", default=None, type=click.Choice(["user", "admin", "manager", "client", "vendor"]))
 @click.option("--active/--inactive", default=None)
+@click.option("--current-password", default=None, help="Your password, to change your own email.")
+@click.option("--totp", default=None, help="Your 2FA code, to change your own email.")
 @click.pass_context
-def update(ctx, person, first_name, last_name, email, phone, role, active):
+def update(ctx, person, first_name, last_name, email, phone, role, active, current_password, totp):
     """Update a person."""
     require_auth(ctx)
     # Send only the changed fields. Zou regenerates the token of a bot when
@@ -90,6 +92,10 @@ def update(ctx, person, first_name, last_name, email, phone, role, active):
         p["role"] = role
     if active is not None:
         p["active"] = active
+    if current_password:
+        p["current_password"] = current_password
+    if totp:
+        p["totp"] = totp
     result = gazu.person.update_person(p)
     output(result, ctx)
 

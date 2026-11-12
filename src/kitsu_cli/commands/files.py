@@ -243,6 +243,17 @@ def working_download(ctx, working_file, file_path):
         click.echo(f"Downloaded to {file_path}.")
 
 
+@working_group.command("update")
+@click.argument("working_file")
+@click.option("--data", required=True, help="JSON string of fields to update.")
+@click.pass_context
+def working_update(ctx, working_file, data):
+    """Update a working file."""
+    require_auth(ctx)
+    result = gazu.files.update_working_file(working_file, json_mod.loads(data))
+    output(result, ctx)
+
+
 @working_group.command("new")
 @click.argument("task")
 @click.option("--name", default="main")
