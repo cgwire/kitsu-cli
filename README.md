@@ -34,6 +34,9 @@ kitsu auth login --host https://kitsu.mystudio.com --email admin@example.com --p
 # Login with an API token
 kitsu auth login --host https://kitsu.mystudio.com --token YOUR_TOKEN
 
+# Login through the Kitsu web page (SSO, 2FA)
+kitsu auth login --host https://kitsu.mystudio.com --browser
+
 # Check authentication status
 kitsu auth status
 

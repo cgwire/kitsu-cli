@@ -18,8 +18,9 @@ def group():
 @click.option("--password", "-p", help="User password (prompted if not given).")
 @click.option("--token", "-t", help="Use an existing API token instead of email/password.")
 @click.option("--host", "-h", "login_host", help="Kitsu server URL.")
+@click.option("--browser", "-b", is_flag=True, help="Log in through the Kitsu web page (SSO, 2FA).")
 @click.pass_context
-def login(ctx, email, password, token, login_host):
+def login(ctx, email, password, token, login_host, browser):
     """Log in to a Kitsu server."""
     host = login_host or get_host(ctx.obj.get("host"))
     if not host:
@@ -45,6 +46,16 @@ def login(ctx, email, password, token, login_host):
         if not ctx.obj.get("quiet"):
             user = result.get("user", {})
             click.echo(f"Logged in as {user.get('full_name', user.get('email', '?'))}.")
+        return
+
+    if browser:
+        try:
+            result = gazu.log_in_with_browser(app_name="kitsu-cli")
+        except Exception as e:
+            raise click.ClickException(f"Login failed: {e}")
+        store_credentials(host, result["access_token"])
+        if not ctx.obj.get("quiet"):
+            click.echo("Logged in.")
         return
 
     if not email:
