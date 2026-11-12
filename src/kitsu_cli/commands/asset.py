@@ -104,8 +104,7 @@ def create(ctx, project, asset_type, name, description, episode, extra_data, wit
                 for tt in gazu.task.all_task_types_for_project(proj)
                 if tt.get("for_entity", "Asset") == "Asset"
             ]
-        # gazu <= 1.3.1 posts to data/assets/<id>/tasks, which is GET only.
-        gazu.client.post(f"data/entities/{result['id']}/tasks", {"task_type_ids": type_ids})
+        gazu.task.create_asset_tasks(result, type_ids)
         if not ctx.obj.get("quiet"):
             click.echo(f"Created {len(type_ids)} task(s).", err=True)
     output(result, ctx)

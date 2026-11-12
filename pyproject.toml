@@ -8,7 +8,7 @@ authors = [
 ]
 requires-python = ">=3.10"
 dependencies = [
-    "gazu>=0.10.0",
+    "gazu>=1.3.1",
     "click>=8.1",
     "rich>=13.0",
     "tomli-w>=1.0",
@@ -29,3 +29,7 @@ dev = [
     "pytest>=8.0",
     "pytest-mock>=3.14",
 ]
+
+# shortcut: gazu main is not on PyPI yet, drop this source once gazu > 1.3.1 is released.
+[tool.uv.sources]
+gazu = { git = "https://github.com/cgwire/gazu", rev = "f33b3af" }

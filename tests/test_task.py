@@ -47,51 +47,6 @@ def test_get_by_entity_refuses_a_name_without_project(invoke):
         assert "--project" in result.output
 
 
-def test_assign_sends_a_list_of_task_ids(invoke):
-    # gazu <= 1.3.1 sends a string, and Zou answers ParameterException.
-    with patch("kitsu_cli.commands.task.gazu") as mock_gazu, \
-         patch("kitsu_cli.commands.task.require_auth"), \
-         patch("kitsu_cli.commands.task.resolve_person", return_value=MOCK_PERSON):
-        result = invoke("task", "assign", "task-1", "--person", "bot@studio.test")
-        assert result.exit_code == 0
-        mock_gazu.client.put.assert_called_once_with(
-            "actions/persons/person-uuid-1/assign", {"task_ids": ["task-1"]}
-        )
-
-
-def test_batch_assign_uses_the_route_of_zou(invoke):
-    # gazu <= 1.3.1 calls data/tasks/assign, which Zou does not have.
-    with patch("kitsu_cli.commands.task.gazu") as mock_gazu, \
-         patch("kitsu_cli.commands.task.require_auth"), \
-         patch("kitsu_cli.commands.task.resolve_person", return_value=MOCK_PERSON):
-        result = invoke(
-            "task", "batch-assign", "--person", "bot@studio.test", "task-1", "task-2"
-        )
-        assert result.exit_code == 0
-        mock_gazu.client.put.assert_called_once_with(
-            "actions/persons/person-uuid-1/assign",
-            {"task_ids": ["task-1", "task-2"]},
-        )
-
-
-def test_create_tasks_on_an_asset_uses_the_route_of_zou(invoke):
-    # gazu <= 1.3.1 posts to data/assets/<id>/tasks, which is GET only.
-    with patch("kitsu_cli.commands.task.gazu") as mock_gazu, \
-         patch("kitsu_cli.commands.task.require_auth"), \
-         patch("kitsu_cli.commands.task.resolve_task_type",
-               side_effect=lambda name: {"id": f"tt-{name}"}):
-        mock_gazu.client.post.return_value = [{"id": "task-1"}, {"id": "task-2"}]
-        result = invoke(
-            "task", "create-tasks", "asset-uuid-1", "--entity-type", "asset",
-            "--task-type", "Specs", "--task-type", "Plan",
-        )
-        assert result.exit_code == 0
-        mock_gazu.client.post.assert_called_once_with(
-            "data/entities/asset-uuid-1/tasks",
-            {"task_type_ids": ["tt-Specs", "tt-Plan"]},
-        )
-
-
 def test_preview_tokens_adds_to_the_preview_and_to_the_asset(invoke):
     store = {
         "data/preview-files/pf-1": {"id": "pf-1", "task_id": "task-1", "token_in": 10, "token_out": None},

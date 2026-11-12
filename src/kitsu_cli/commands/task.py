@@ -238,9 +238,7 @@ def start(ctx, task, person):
 def assign(ctx, task, person):
     """Assign a person to a task."""
     require_auth(ctx)
-    # gazu <= 1.3.1 sends task_ids as a string: Zou refuses it.
-    person_id = resolve_person(person)["id"]
-    result = gazu.client.put(f"actions/persons/{person_id}/assign", {"task_ids": [task]})
+    result = gazu.task.assign_task(task, resolve_person(person))
     output(result, ctx)
 
 
@@ -336,9 +334,7 @@ def get_by_entity(ctx, entity, task_type, name, project):
 def batch_assign(ctx, person, tasks):
     """Assign multiple tasks to a person."""
     require_auth(ctx)
-    # gazu <= 1.3.1 calls data/tasks/assign, a route that Zou does not have.
-    person_id = resolve_person(person)["id"]
-    result = gazu.client.put(f"actions/persons/{person_id}/assign", {"task_ids": list(tasks)})
+    result = gazu.task.assign_tasks_to_person(list(tasks), resolve_person(person))
     output(result, ctx)
 
 
@@ -368,11 +364,7 @@ def create_tasks(ctx, entity, task_types, entity_type):
     if entity_type == "shot":
         result = gazu.task.create_shot_tasks(entity, tt_list)
     else:
-        # gazu <= 1.3.1 posts asset tasks to data/assets/<id>/tasks, which is
-        # GET only. Zou creates the tasks of any entity on this route.
-        result = gazu.client.post(
-            f"data/entities/{entity}/tasks", {"task_type_ids": [tt["id"] for tt in tt_list]}
-        )
+        result = gazu.task.create_entity_tasks(entity, tt_list)
     output(result, ctx)
 
 

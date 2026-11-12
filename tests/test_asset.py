@@ -61,8 +61,7 @@ def test_asset_type_list(invoke):
         assert "Character" in result.output
 
 
-def test_asset_create_with_tasks_uses_the_route_of_zou(invoke):
-    # gazu <= 1.3.1 posts to data/assets/<id>/tasks, which is GET only.
+def test_asset_create_with_tasks_uses_the_given_task_types(invoke):
     with patch("kitsu_cli.commands.asset.gazu") as mock_gazu, \
          patch("kitsu_cli.commands.asset.require_auth"), \
          patch("kitsu_cli.commands.asset.resolve_project", return_value=MOCK_PROJECT), \
@@ -76,9 +75,8 @@ def test_asset_create_with_tasks_uses_the_route_of_zou(invoke):
             "Character01",
         )
         assert result.exit_code == 0
-        mock_gazu.client.post.assert_called_once_with(
-            "data/entities/asset-uuid-1/tasks",
-            {"task_type_ids": ["tt-Specs", "tt-Plan"]},
+        mock_gazu.task.create_asset_tasks.assert_called_once_with(
+            MOCK_ASSET, ["tt-Specs", "tt-Plan"]
         )
 
 
@@ -97,6 +95,4 @@ def test_asset_create_with_tasks_defaults_to_the_task_types_of_the_project(invok
             "--with-tasks", "Character01",
         )
         assert result.exit_code == 0
-        mock_gazu.client.post.assert_called_once_with(
-            "data/entities/asset-uuid-1/tasks", {"task_type_ids": ["tt-1"]}
-        )
+        mock_gazu.task.create_asset_tasks.assert_called_once_with(MOCK_ASSET, ["tt-1"])
