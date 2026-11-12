@@ -138,3 +138,21 @@ def test_task_url_gives_the_episode_in_a_tv_show(invoke):
             mock_gazu.client.get_api_url_from_host.return_value = host
             result = invoke("task", "task-url", "task-1")
             assert result.output.strip() == expected, (for_entity, fields)
+
+
+def test_list_open_resolves_filters_and_keeps_unassigned(invoke):
+    with patch("kitsu_cli.commands.task.gazu") as mock_gazu, \
+         patch("kitsu_cli.commands.task.require_auth"), \
+         patch("kitsu_cli.commands.task.resolve_project", return_value=MOCK_PROJECT), \
+         patch("kitsu_cli.commands.task.resolve_person") as resolve_person:
+        mock_gazu.task.all_open_tasks.return_value = {"data": [], "stats": {}}
+        result = invoke(
+            "task", "list-open", "--project", "Test Project", "--person", "unassigned", "--limit", "10"
+        )
+        assert result.exit_code == 0
+        resolve_person.assert_not_called()
+        kwargs = mock_gazu.task.all_open_tasks.call_args.kwargs
+        assert kwargs["project"] == MOCK_PROJECT
+        assert kwargs["person"] == "unassigned"
+        assert kwargs["limit"] == 10
+        assert kwargs["task_type"] is None

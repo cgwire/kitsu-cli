@@ -299,16 +299,50 @@ def _episode_id(t, for_entity):
 
 
 @group.command("list-open")
-@click.option("--person", help="Person UUID or email.")
+@click.option("--project", help="Project UUID or name.")
+@click.option("--task-type", help="Task type UUID or name.")
+@click.option("--status", help="Task status UUID or short name.")
+@click.option("--person", help="Person UUID or email, or 'unassigned'.")
+@click.option("--department", help="Department UUID or name.")
+@click.option("--studio", help="Studio UUID.")
+@click.option("--start-date", help="Start date (YYYY-MM-DD).")
+@click.option("--due-date", help="Due date (YYYY-MM-DD).")
+@click.option("--priority", type=int)
+@click.option("--page", type=int)
+@click.option("--limit", type=int)
 @click.pass_context
-def list_open(ctx, person):
-    """List all open tasks, optionally filtered by person."""
+def list_open(ctx, project, task_type, status, person, department, studio,
+              start_date, due_date, priority, page, limit):
+    """List open tasks, with optional filters."""
     require_auth(ctx)
-    if person:
-        results = gazu.task.all_open_tasks_for_person(resolve_person(person))
-    else:
-        results = gazu.task.all_open_tasks()
+    if person and person != "unassigned":
+        person = resolve_person(person)
+    results = gazu.task.all_open_tasks(
+        project=resolve_project(project) if project else None,
+        task_type=resolve_task_type(task_type) if task_type else None,
+        task_status=resolve_task_status(status) if status else None,
+        person=person,
+        department=resolve_department(department) if department else None,
+        studio=studio,
+        start_date=start_date,
+        due_date=due_date,
+        priority=priority,
+        page=page,
+        limit=limit,
+    )
     output(results, ctx)
+
+
+@group.command("copy-client-comments")
+@click.option("--project", required=True, help="Project UUID or name.")
+@click.option("--prefix", default="", help="Text to put before each copied comment.")
+@click.argument("tasks", nargs=-1, required=True, metavar="TASK_UUID...")
+@click.pass_context
+def copy_client_comments(ctx, project, prefix, tasks):
+    """Copy the last client comment of each task into a studio comment."""
+    require_auth(ctx)
+    result = gazu.task.copy_last_client_comments(resolve_project(project), list(tasks), prefix=prefix)
+    output(result, ctx)
 
 
 @group.command("get-by-entity")
