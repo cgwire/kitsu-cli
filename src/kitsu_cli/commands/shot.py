@@ -214,17 +214,17 @@ def import_csv(ctx, project, csv_file):
 @click.option("--project", required=True, help="Project UUID or name.")
 @click.argument("csv_file", type=click.Path())
 @click.option("--episode", default=None, help="Episode UUID.")
-@click.option("--assigned-to", default=None, help="Person UUID.")
+@click.option("--assigned-to-me", is_flag=True, help="Only the entities with tasks assigned to you.")
 @click.pass_context
-def export_csv(ctx, project, csv_file, episode, assigned_to):
+def export_csv(ctx, project, csv_file, episode, assigned_to_me):
     """Export shots to a CSV file."""
     require_auth(ctx)
     proj = resolve_project(project)
     kwargs = {}
     if episode:
         kwargs["episode"] = resolve_episode(episode)
-    if assigned_to:
-        kwargs["assigned_to"] = assigned_to
+    if assigned_to_me:
+        kwargs["assigned_to_me"] = True
     gazu.shot.export_shots_with_csv(proj, csv_file, **kwargs)
     if not ctx.obj.get("quiet"):
         click.echo(f"Exported to {csv_file}.")
